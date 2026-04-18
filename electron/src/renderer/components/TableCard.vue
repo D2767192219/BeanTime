@@ -27,11 +27,13 @@
     <div class="table-card-actions">
       <!-- 空闲状态 -->
       <template v-if="table.status === 'idle'">
-        <div class="btn-wrap">
-          <el-button type="success" class="manage-btn" @click="emit('open', table)">立即开台</el-button>
-        </div>
-        <div class="btn-wrap">
-          <el-button type="warning" class="manage-btn" @click="emit('reserve', table)">客户预约</el-button>
+        <div class="action-row">
+          <div class="btn-flex-grow">
+            <el-button type="success" class="manage-btn" @click="emit('open', table)">立即开台</el-button>
+          </div>
+          <div class="btn-flex-small">
+            <el-button type="warning" class="manage-btn" @click="emit('reserve', table)">客户预约</el-button>
+          </div>
         </div>
       </template>
 
