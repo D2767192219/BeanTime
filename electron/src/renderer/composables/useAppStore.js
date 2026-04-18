@@ -203,12 +203,20 @@ export function useAppStore() {
   }
 
   function startTable(table) {
-    table.status = 'in_use';
-    table.timerStart = Date.now();
-    table.timerPausedTime = 0;
-    table.totalPausedDuration = 0;
-    persistTable(table);
-    ElMessage.success(`「${table.name}」开始计时`);
+    if (table.status === 'reserved') {
+      table.status = 'selecting';
+      persistTable(table);
+      ElMessage.success(`「${table.name}」已开始选豆`);
+    } else if (table.status === 'selecting') {
+      table.status = 'in_use';
+      if (!table.timerStart) {
+        table.timerStart = Date.now();
+      }
+      table.timerPausedTime = 0;
+      table.totalPausedDuration = 0;
+      persistTable(table);
+      ElMessage.success(`「${table.name}」开始计时`);
+    }
   }
 
   function pauseTable(table) {
@@ -304,15 +312,27 @@ export function useAppStore() {
     const to = state.tables.find((x) => x.id === toId);
     if (!from || !to) return;
 
-    to.status = from.status;
-    to.sessionId = from.sessionId;
-    to.timerStart = from.timerStart;
-    to.timerPausedTime = from.timerPausedTime;
-    to.totalPausedDuration = from.totalPausedDuration;
+    const tempStatus = from.status;
+    const tempSessionId = from.sessionId;
+    const tempTimerStart = from.timerStart;
+    const tempTimerPausedTime = from.timerPausedTime;
+    const tempTotalPausedDuration = from.totalPausedDuration;
 
-    resetTable(from);
+    from.status = to.status;
+    from.sessionId = to.sessionId;
+    from.timerStart = to.timerStart;
+    from.timerPausedTime = to.timerPausedTime;
+    from.totalPausedDuration = to.totalPausedDuration;
+
+    to.status = tempStatus;
+    to.sessionId = tempSessionId;
+    to.timerStart = tempTimerStart;
+    to.timerPausedTime = tempTimerPausedTime;
+    to.totalPausedDuration = tempTotalPausedDuration;
+
     persistTable(from);
     persistTable(to);
+    ElMessage.success(`「${from.name}」与「${to.name}」已互换`);
   }
 
   function deleteTable(id) {
@@ -321,6 +341,27 @@ export function useAppStore() {
       console.error('[delete table error]', error);
       ElMessage.error('删除失败');
     });
+  }
+
+  function editTable(id, updates) {
+    const table = state.tables.find((x) => x.id === id);
+    if (!table) return false;
+
+    if (updates.name != null) {
+      const parsed = parseCode(updates.name);
+      if (parsed) {
+        table.codePrefix = normalizePrefix(parsed.codePrefix);
+        table.number = parsed.number;
+        table.name = `${table.codePrefix}-${table.number}`;
+      } else {
+        table.name = updates.name;
+      }
+    }
+    if (updates.areaId != null) table.areaId = updates.areaId;
+    if (updates.tag != null) table.tag = updates.tag;
+
+    persistTable(table);
+    return true;
   }
 
   function addTables({ areaId, startNum, count, tag, prefix }) {
@@ -506,6 +547,7 @@ export function useAppStore() {
     restoreFromHistory,
     changeTable,
     deleteTable,
+    editTable,
     addTables,
     addArea,
     deleteArea,

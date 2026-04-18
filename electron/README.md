@@ -44,9 +44,6 @@ npm run dist:mac    # 仅打包 macOS
 - electron-builder 25
 - 原生 HTML/CSS/JS（无框架依赖）
 
-启动
 
-cd /Users/ren/Documents/GitHub/jgdz/electron && npm run start 2>&1 &
-
-cd /Users/ren/Documents/GitHub/jgdz/electron
+cd /electron
 npm run dev

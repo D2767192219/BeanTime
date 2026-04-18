@@ -45,8 +45,15 @@
     <div class="sidebar-section">
       <div class="sidebar-title">桌台管理</div>
       <div class="manage-actions">
-        <el-button type="primary" plain @click="emit('open-add-table')">新建桌台</el-button>
-        <el-button type="danger" plain @click="emit('open-delete-table')">删除桌台</el-button>
+        <div class="btn-wrap">
+          <el-button type="primary" plain class="manage-btn" @click="emit('open-add-table')">新建桌台</el-button>
+        </div>
+        <div class="btn-wrap">
+          <el-button type="warning" plain class="manage-btn" @click="emit('open-edit-table')">编辑桌台</el-button>
+        </div>
+        <div class="btn-wrap">
+          <el-button type="danger" plain class="manage-btn" @click="emit('open-delete-table')">删除桌台</el-button>
+        </div>
       </div>
     </div>
   </aside>
@@ -64,7 +71,7 @@ const props = defineProps({
   statusOrder: { type: Array, required: true },
 });
 
-const emit = defineEmits(['update:status', 'update:tag', 'open-add-table', 'open-delete-table']);
+const emit = defineEmits(['update:status', 'update:tag', 'open-add-table', 'open-edit-table', 'open-delete-table']);
 
 const statusMetaList = computed(() => props.statusOrder.map((key) => ({
   value: key,

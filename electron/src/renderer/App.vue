@@ -19,6 +19,7 @@
         @update:status="(value) => (state.filters.status = value)"
         @update:tag="(value) => (state.filters.tag = value)"
         @open-add-table="openAddDialog"
+        @open-edit-table="onOpenEdit"
         @open-delete-table="openDeleteDialog"
       />
 
@@ -137,20 +138,31 @@
             <span>{{ areaCounts[area.id] || 0 }} 桌</span>
           </div>
           <el-button type="danger" plain @click="confirmDeleteArea(area)">删除</el-button>
-        </div>
       </div>
+    </div>
     </el-dialog>
 
-    <el-dialog v-model="changeDialog.visible" title="更换桌台" width="420px">
+    <el-dialog v-model="changeDialog.visible" title="更换桌台" width="480px">
       <el-form label-width="100px">
+        <el-form-item label="当前台桌">
+          <el-input :model-value="currentTableName" disabled />
+        </el-form-item>
         <el-form-item label="目标台桌">
-          <el-select v-model="changeDialog.targetId" style="width: 100%" placeholder="选择空闲桌台">
+          <el-select v-model="changeDialog.targetId" style="width: 100%" placeholder="选择目标台桌">
             <el-option
               v-for="table in changeTargets"
               :key="table.id"
-              :label="table.name"
+              :label="table.name + (table.tag ? ' - ' + table.tag : '')"
               :value="table.id"
-            />
+            >
+              <div class="change-option-content">
+                <span class="change-option-name">{{ table.name }}</span>
+                <el-tag v-if="table.tag" size="small" type="info">{{ table.tag }}</el-tag>
+                <el-tag size="small" :type="STATUS_META[table.status]?.tag || 'info'">
+                  {{ STATUS_META[table.status]?.label || table.status }}
+                </el-tag>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
       </el-form>
@@ -253,6 +265,39 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="editTableDialog.visible" title="编辑桌台" width="520px">
+      <el-table :data="state.tables" max-height="380" @row-click="onSelectEditTable" row-class-name="clickable-row">
+        <el-table-column prop="name" label="桌台" min-width="120">
+          <template #default="scope">{{ scope.row.name }}</template>
+        </el-table-column>
+        <el-table-column label="区域" min-width="120">
+          <template #default="scope">{{ areaMap[scope.row.areaId]?.name || '未分区' }}</template>
+        </el-table-column>
+        <el-table-column prop="tag" label="标签" min-width="120">
+          <template #default="scope">{{ scope.row.tag || '—' }}</template>
+        </el-table-column>
+      </el-table>
+
+      <el-form v-if="editTableDialog.table" label-width="100px" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <el-form-item label="桌台名称">
+          <el-input v-model="editTableDialog.table.name" placeholder="例如：A-1" />
+        </el-form-item>
+        <el-form-item label="区域">
+          <el-select v-model="editTableDialog.table.areaId" style="width: 100%">
+            <el-option v-for="area in state.areas" :key="area.id" :label="area.name" :value="area.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-input v-model="editTableDialog.table.tag" placeholder="例如：靠窗、包厢" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editTableDialog.visible = false">取消</el-button>
+        <el-button type="primary" :disabled="!editTableDialog.table" @click="confirmEditTable">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -291,6 +336,7 @@ const {
   restoreFromHistory,
   changeTable,
   deleteTable,
+  editTable,
   addTables,
   addArea,
   deleteArea,
@@ -305,10 +351,20 @@ const changeDialog = reactive({ visible: false, fromId: '', targetId: '' });
 const endDialog = reactive({ visible: false, tableId: '' });
 const revenueDialog = reactive({ visible: false });
 const historyDialog = reactive({ visible: false });
+const editTableDialog = reactive({ visible: false, table: null });
 const deleteDialog = reactive({ visible: false, selectedIds: [] });
 
-const changeTargets = computed(() => state.tables.filter((x) => x.id !== changeDialog.fromId && x.status === 'idle'));
+const changeTargets = computed(() => state.tables.filter((x) => x.id !== changeDialog.fromId));
+const currentTableName = computed(() => {
+  const table = state.tables.find((x) => x.id === changeDialog.fromId);
+  return table ? `${table.name}${table.tag ? ' - ' + table.tag : ''}` : '';
+});
 const endTableRef = computed(() => state.tables.find((x) => x.id === endDialog.tableId) || null);
+const areaMap = computed(() => {
+  const map = Object.create(null);
+  for (const area of state.areas) map[area.id] = area;
+  return map;
+});
 
 const groupedAreaTables = computed(() => {
   const grouped = new Map();
@@ -414,6 +470,28 @@ function onChange(table) {
 function confirmChange() {
   changeTable(changeDialog.fromId, changeDialog.targetId);
   changeDialog.visible = false;
+}
+
+function onOpenEdit() {
+  editTableDialog.visible = true;
+  editTableDialog.table = null;
+}
+
+function onSelectEditTable(row) {
+  editTableDialog.table = {
+    id: row.id,
+    name: row.name,
+    areaId: row.areaId,
+    tag: row.tag,
+  };
+}
+
+function confirmEditTable() {
+  if (!editTableDialog.table) return;
+  const { id, name, areaId, tag } = editTableDialog.table;
+  editTable(id, { name, areaId, tag });
+  editTableDialog.visible = false;
+  editTableDialog.table = null;
 }
 
 function onEndTiming(table) {

@@ -123,8 +123,26 @@ body {
 }
 
 .manage-actions {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.btn-wrap {
+  width: 100%;
+}
+
+.manage-btn.el-button {
+  width: 100%;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  border: 1px solid currentColor !important;
+  border-width: 1px !important;
+  box-sizing: border-box;
+  display: flex !important;
+  justify-content: center;
 }
 
 .workspace {
@@ -299,6 +317,21 @@ body {
   align-items: center;
   gap: 8px;
   color: var(--muted);
+}
+
+.change-option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.change-option-name {
+  font-weight: 600;
+}
+
+.clickable-row {
+  cursor: pointer;
 }
 
 @media (max-width: 980px) {

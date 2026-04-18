@@ -30,18 +30,27 @@
         <el-button type="warning" @click="emit('reserve', table)">客户预约</el-button>
       </template>
 
+      <template v-else-if="table.status === 'reserved'">
+        <el-button type="primary" @click="emit('start', table)">立即开台</el-button>
+      </template>
+
+      <template v-else-if="table.status === 'selecting'">
+        <el-button type="primary" @click="emit('start', table)">开始计时</el-button>
+        <el-button type="warning" @click="emit('pause', table)">暂停计时</el-button>
+        <el-button @click="emit('change', table)">更换桌台</el-button>
+      </template>
+
       <template v-else>
         <el-button
           class="action-row-full"
-          :type="table.status === 'reserved' || table.status === 'selecting' ? 'primary' : 'danger'"
-          @click="table.status === 'reserved' || table.status === 'selecting' ? emit('start', table) : emit('settle', table)"
+          type="danger"
+          @click="emit('settle', table)"
         >
-          {{ table.status === 'reserved' || table.status === 'selecting' ? '开始计时' : '结束计时' }}
+          结束计时
         </el-button>
 
         <el-button
           :type="table.status === 'paused' ? 'primary' : 'warning'"
-          :disabled="table.status === 'reserved' || table.status === 'selecting'"
           @click="table.status === 'paused' ? emit('resume', table) : emit('pause', table)"
         >
           {{ table.status === 'paused' ? '继续计时' : '暂停计时' }}
@@ -68,5 +77,5 @@ const props = defineProps({
 const emit = defineEmits(['open', 'reserve', 'start', 'pause', 'resume', 'settle', 'change']);
 
 const status = computed(() => props.statusMeta[props.table.status] || { label: props.table.status, tag: 'info' });
-const running = computed(() => props.table.status === 'in_use' || props.table.status === 'paused');
+const running = computed(() => props.table.status === 'in_use' || props.table.status === 'paused' || props.table.status === 'reserved');
 </script>
