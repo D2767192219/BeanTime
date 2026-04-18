@@ -47,3 +47,19 @@ npm run dist:mac    # 仅打包 macOS
 
 cd /electron
 npm run dev
+
+ # 1. 设置 Electron 核心包镜像 (淘宝)
+>> $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+>>
+>> # 2. 设置 Electron Builder 工具包镜像 (使用国内常用的替代源)
+>> # 注意：这里使用的是由国内社区维护的镜像映射
+>> $env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+>>
+>> # 3. 运行打包
+>> npm run dist:win
+
+
+
+cd c:\Users\27671\Documents\GitHub\BeanTime\electron; npm run build:renderer
+
+cd c:\Users\27671\Documents\GitHub\BeanTime\electron; npm run dist:win

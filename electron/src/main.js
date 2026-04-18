@@ -83,7 +83,7 @@ function createWindow() {
   });
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  const rendererFile = path.join(__dirname, '..', 'dist', 'renderer', 'index.html');
+  const rendererFile = path.join(app.getAppPath(), 'dist', 'renderer', 'index.html');
 
   if (devServerUrl) {
     win.loadURL(devServerUrl);
