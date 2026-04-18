@@ -62,6 +62,7 @@
                   :format-start-time="formatStartTime"
                   @open="openTable"
                   @reserve="reserveTable"
+                  @cancel-reserve="cancelReserve"
                   @start="startTable"
                   @pause="pauseTable"
                   @resume="resumeTable"
@@ -198,13 +199,19 @@
       </el-row>
 
       <el-table :data="sortedRecords" height="320" empty-text="暂无结算记录">
-        <el-table-column prop="tableName" label="桌台" min-width="120" />
+        <el-table-column label="类型" min-width="80">
+          <template #default="scope">
+            <el-tag v-if="scope.row.type === 'reserve_cancel'" type="warning" size="small">预约取消</el-tag>
+            <el-tag v-else type="success" size="small">计时</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="tableName" label="桌台" min-width="100" />
         <el-table-column prop="sessionId" label="编号" min-width="110" />
         <el-table-column label="时长" min-width="110">
           <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
         </el-table-column>
-        <el-table-column label="金额" min-width="120">
-          <template #default="scope">{{ formatMoney(scope.row.revenue) }}</template>
+        <el-table-column label="金额" min-width="100">
+          <template #default="scope">{{ scope.row.type === 'reserve_cancel' ? '—' : formatMoney(scope.row.revenue) }}</template>
         </el-table-column>
         <el-table-column label="时间" min-width="180">
           <template #default="scope">
@@ -220,31 +227,80 @@
     </el-dialog>
 
     <el-dialog v-model="historyDialog.visible" title="历史记录" width="860px">
-      <el-table :data="sortedHistories" height="360" empty-text="暂无历史记录">
-        <el-table-column prop="tableCode" label="桌台" min-width="100" />
-        <el-table-column prop="duration" label="时长" min-width="120">
-          <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
-        </el-table-column>
-        <el-table-column prop="revenue" label="金额" min-width="120">
-          <template #default="scope">{{ formatMoney(scope.row.revenue) }}</template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="结束时间" min-width="180">
-          <template #default="scope">{{ new Date(scope.row.createdAt).toLocaleString('zh-CN') }}</template>
-        </el-table-column>
-        <el-table-column prop="restoredAt" label="状态" min-width="140">
-          <template #default="scope">{{ scope.row.restoredAt ? '已恢复' : '可恢复' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" min-width="120" fixed="right">
-          <template #default="scope">
-            <el-button size="small" type="primary" plain @click="onRestoreHistory(scope.row)">恢复</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <el-tabs>
+        <el-tab-pane label="计时记录">
+          <el-table :data="timingHistories" height="360" empty-text="暂无计时记录">
+            <el-table-column prop="tableCode" label="桌台" min-width="100" />
+            <el-table-column label="编号" min-width="100">
+              <template #default="scope">{{ scope.row.tableSnapshot?.sessionId || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="duration" label="时长" min-width="120">
+              <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
+            </el-table-column>
+            <el-table-column prop="revenue" label="金额" min-width="120">
+              <template #default="scope">{{ formatMoney(scope.row.revenue) }}</template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="结束时间" min-width="180">
+              <template #default="scope">{{ new Date(scope.row.createdAt).toLocaleString('zh-CN') }}</template>
+            </el-table-column>
+            <el-table-column prop="restoredAt" label="状态" min-width="100">
+              <template #default="scope">{{ scope.row.restoredAt ? '已恢复' : '可恢复' }}</template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="120" fixed="right">
+              <template #default="scope">
+                <el-button size="small" type="primary" plain :disabled="!!scope.row.restoredAt" @click="onRestoreHistory(scope.row)">恢复</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="预约记录">
+          <el-table :data="reserveHistories" height="360" empty-text="暂无预约记录">
+            <el-table-column prop="tableCode" label="桌台" min-width="100" />
+            <el-table-column label="编号" min-width="100">
+              <template #default="scope">{{ scope.row.tableSnapshot?.sessionId || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="duration" label="等待时长" min-width="120">
+              <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="取消时间" min-width="180">
+              <template #default="scope">{{ new Date(scope.row.createdAt).toLocaleString('zh-CN') }}</template>
+            </el-table-column>
+            <el-table-column prop="restoredAt" label="状态" min-width="100">
+              <template #default="scope">{{ scope.row.restoredAt ? '已恢复' : '可恢复' }}</template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="120" fixed="right">
+              <template #default="scope">
+                <el-button size="small" type="primary" plain :disabled="!!scope.row.restoredAt" @click="onRestoreHistory(scope.row)">恢复</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
     </el-dialog>
 
     <el-dialog v-model="deleteDialog.visible" title="删除桌台" width="520px">
+      <div style="margin-bottom: 12px">
+        <el-checkbox
+          :model-value="isAllSelected"
+          :indeterminate="isIndeterminate"
+          @change="toggleSelectAll"
+        >
+          全选
+        </el-checkbox>
+        <span style="margin-left: 12px; color: var(--muted); font-size: 12px">
+          已选择 {{ deleteDialog.selectedIds.length }} 个桌台
+        </span>
+      </div>
       <el-table :data="state.tables" max-height="380">
         <el-table-column width="52">
+          <template #header>
+            <el-checkbox
+              :model-value="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="toggleSelectAll"
+            />
+          </template>
           <template #default="scope">
             <el-checkbox :model-value="deleteDialog.selectedIds.includes(scope.row.id)" @change="(checked) => toggleDeleteSelection(scope.row.id, checked)" />
           </template>
@@ -319,6 +375,8 @@ const {
   filteredTables,
   sortedRecords,
   sortedHistories,
+  timingHistories,
+  reserveHistories,
   todayRevenue,
   totalRevenue,
   getDuration,
@@ -329,6 +387,7 @@ const {
   formatStartTime,
   openTable,
   reserveTable,
+  cancelReserve,
   startTable,
   pauseTable,
   resumeTable,
@@ -365,6 +424,17 @@ const areaMap = computed(() => {
   for (const area of state.areas) map[area.id] = area;
   return map;
 });
+
+const isAllSelected = computed(() => state.tables.length > 0 && deleteDialog.selectedIds.length === state.tables.length);
+const isIndeterminate = computed(() => deleteDialog.selectedIds.length > 0 && deleteDialog.selectedIds.length < state.tables.length);
+
+function toggleSelectAll(checked) {
+  if (checked) {
+    deleteDialog.selectedIds = state.tables.map((t) => t.id);
+  } else {
+    deleteDialog.selectedIds = [];
+  }
+}
 
 const groupedAreaTables = computed(() => {
   const grouped = new Map();

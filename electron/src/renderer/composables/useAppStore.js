@@ -109,6 +109,8 @@ export function useAppStore() {
   const totalRevenue = computed(() => state.records.reduce((sum, r) => sum + (r.revenue || 0), 0));
   const sortedRecords = computed(() => [...state.records].sort((a, b) => b.createdAt - a.createdAt));
   const sortedHistories = computed(() => [...state.histories].sort((a, b) => b.createdAt - a.createdAt));
+const timingHistories = computed(() => sortedHistories.value.filter((h) => h.type === 'timing'));
+const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.type === 'reserve'));
 
   function getDuration(table) {
     if (!table.timerStart) return 0;
@@ -195,15 +197,65 @@ export function useAppStore() {
   function reserveTable(table) {
     table.status = 'reserved';
     table.sessionId = genNumericId();
-    table.timerStart = null;
+    table.timerStart = Date.now();  // 预约开始计时
     table.timerPausedTime = 0;
     table.totalPausedDuration = 0;
     persistTable(table);
     ElMessage.success(`「${table.name}」已预约`);
   }
 
+  function cancelReserve(table) {
+    const duration = getDuration(table);
+
+    // 生成预约取消记录
+    const reserveRecord = {
+      id: uuid(),
+      tableId: table.id,
+      tableName: table.name,
+      areaName: areaMap.value[table.areaId]?.name || '',
+      sessionId: table.sessionId || '',
+      startTime: table.timerStart || Date.now(),
+      endTime: Date.now(),
+      duration,
+      revenue: 0,
+      type: 'reserve_cancel',  // 预约取消记录
+      createdAt: Date.now(),
+    };
+
+    state.records.push(reserveRecord);
+    db.put('records', reserveRecord).catch((error) => {
+      console.error('[put reserve cancel record error]', error);
+    });
+
+    // 创建预约历史记录，可恢复
+    const history = {
+      id: uuid(),
+      tableId: table.id,
+      tableCode: table.name,
+      createdAt: Date.now(),
+      duration,
+      revenue: 0,
+      type: 'reserve',  // 预约记录类型
+      tableSnapshot: clone(table),
+      recordId: reserveRecord.id,
+      restoredAt: null,
+    };
+    state.histories.push(history);
+    db.put('histories', history).catch((error) => {
+      console.error('[put history error]', error);
+    });
+
+    resetTable(table);
+    persistTable(table);
+    ElMessage.success(`「${table.name}」已取消预约`);
+  }
+
   function startTable(table) {
     if (table.status === 'reserved') {
+      // 从预约状态转为选豆中，清空预约计时
+      table.timerStart = null;
+      table.totalPausedDuration = 0;
+      table.timerPausedTime = 0;
       table.status = 'selecting';
       persistTable(table);
       ElMessage.success(`「${table.name}」已开始选豆`);
@@ -247,6 +299,7 @@ export function useAppStore() {
       endTime,
       duration,
       revenue,
+      type: 'timing',  // 计时记录
       createdAt: endTime,
     };
 
@@ -263,6 +316,7 @@ export function useAppStore() {
       createdAt: endTime,
       duration,
       revenue,
+      type: 'timing',  // 计时记录类型
       tableSnapshot,
       recordId: record.id,
       restoredAt: null,
@@ -529,6 +583,8 @@ export function useAppStore() {
     filteredTables,
     sortedRecords,
     sortedHistories,
+    timingHistories,
+    reserveHistories,
     todayRevenue,
     totalRevenue,
     getDuration,
@@ -540,6 +596,7 @@ export function useAppStore() {
     formatTableCode,
     openTable,
     reserveTable,
+    cancelReserve,
     startTable,
     pauseTable,
     resumeTable,

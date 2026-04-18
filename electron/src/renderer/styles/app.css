@@ -272,13 +272,40 @@ body {
 }
 
 .table-card-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .action-row-full {
   grid-column: 1 / -1;
+}
+
+.action-row-split {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.timer-row {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.timer-label {
+  color: var(--muted);
+}
+
+.timer-value {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .empty {
