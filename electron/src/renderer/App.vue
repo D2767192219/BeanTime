@@ -61,7 +61,7 @@
                   :format-money="formatMoney"
                   :format-start-time="formatStartTime"
                   @open="openTable"
-                  @reserve="reserveTable"
+                  @reserve="onReserve"
                   @cancel-reserve="cancelReserve"
                   @start="startTable"
                   @pause="pauseTable"
@@ -75,6 +75,22 @@
         </div>
       </section>
     </main>
+
+    <el-dialog v-model="reserveDialog.visible" title="客户预约" width="420px">
+      <el-form label-width="110px">
+        <el-form-item label="桌台">
+          <el-input :model-value="reserveDialog.tableName" disabled />
+        </el-form-item>
+        <el-form-item label="手机尾号">
+          <el-input v-model="reserveDialog.phoneTail" maxlength="4" placeholder="请输入4位手机尾号" style="width: 180px" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="reserveDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="confirmReserve">确认预约</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="addDialog.visible" title="新增桌台" width="500px">
       <el-form label-width="110px">
@@ -103,7 +119,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="settingsDialog.visible" title="计费设置" width="420px">
+    <el-dialog v-model="settingsDialog.visible" title="设置" width="420px">
       <el-form label-width="110px">
         <el-form-item label="每小时费率">
           <el-input-number v-model="settingsDialog.hourlyRate" :min="0" />
@@ -112,6 +128,11 @@
           <el-input v-model="settingsDialog.currency" maxlength="2" />
         </el-form-item>
       </el-form>
+      <el-divider content-position="left">清空历史记录</el-divider>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <el-button type="danger" plain @click="onClearTimingHistories">清空计时记录</el-button>
+        <el-button type="danger" plain @click="onClearReserveHistories">清空预约记录</el-button>
+      </div>
       <template #footer>
         <el-button @click="settingsDialog.visible = false">取消</el-button>
         <el-button type="primary" @click="confirmSettings">保存</el-button>
@@ -174,16 +195,16 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="endDialog.visible" title="结束计时" width="420px">
+    <el-dialog v-model="endDialog.visible" title="结束计时" width="420px" :before-close="onCloseEndDialog">
       <el-descriptions v-if="endTableRef" :column="1" border>
         <el-descriptions-item label="桌台">{{ endTableRef.name }}</el-descriptions-item>
         <el-descriptions-item label="编号">{{ endTableRef.sessionId || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="时长">{{ formatDuration(getDuration(endTableRef)) }}</el-descriptions-item>
+        <el-descriptions-item label="时长">{{ formatTime(getDuration(endTableRef)) }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ formatMoney(calcRevenue(getDuration(endTableRef))) }}</el-descriptions-item>
       </el-descriptions>
 
       <template #footer>
-        <el-button @click="endDialog.visible = false">取消</el-button>
+        <el-button @click="onCloseEndDialog(() => { endDialog.visible = false })">取消</el-button>
         <el-button type="primary" @click="confirmEndTiming">确认结束</el-button>
       </template>
     </el-dialog>
@@ -207,6 +228,9 @@
         </el-table-column>
         <el-table-column prop="tableName" label="桌台" min-width="100" />
         <el-table-column prop="sessionId" label="编号" min-width="110" />
+        <el-table-column label="手机尾号" min-width="90">
+          <template #default="scope">{{ scope.row.phoneTail || '—' }}</template>
+        </el-table-column>
         <el-table-column label="时长" min-width="110">
           <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
         </el-table-column>
@@ -221,7 +245,6 @@
       </el-table>
 
       <template #footer>
-        <el-button type="danger" plain @click="confirmClearRecords">清空记录</el-button>
         <el-button @click="revenueDialog.visible = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -259,6 +282,9 @@
             <el-table-column prop="tableCode" label="桌台" min-width="100" />
             <el-table-column label="编号" min-width="100">
               <template #default="scope">{{ scope.row.tableSnapshot?.sessionId || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="手机尾号" min-width="90">
+              <template #default="scope">{{ scope.row.phoneTail || '—' }}</template>
             </el-table-column>
             <el-table-column prop="duration" label="等待时长" min-width="120">
               <template #default="scope">{{ formatDuration(scope.row.duration) }}</template>
@@ -401,13 +427,16 @@ const {
   deleteArea,
   saveSettings,
   clearRecords,
+  clearTimingHistories,
+  clearReserveHistories,
 } = useAppStore();
 
+const reserveDialog = reactive({ visible: false, tableId: '', tableName: '', phoneTail: '' });
 const addDialog = reactive({ visible: false, areaId: '', prefix: 'A', startNum: 1, count: 1, tag: '' });
 const settingsDialog = reactive({ visible: false, hourlyRate: 30, currency: '¥' });
 const areaDialog = reactive({ visible: false, name: '', color: '#4f8df6' });
 const changeDialog = reactive({ visible: false, fromId: '', targetId: '' });
-const endDialog = reactive({ visible: false, tableId: '' });
+const endDialog = reactive({ visible: false, tableId: '', pausedForDialog: false });
 const revenueDialog = reactive({ visible: false });
 const historyDialog = reactive({ visible: false });
 const editTableDialog = reactive({ visible: false, table: null });
@@ -469,6 +498,27 @@ const groupedAreaTables = computed(() => {
 
   return groups;
 });
+
+function onReserve(table) {
+  reserveDialog.visible = true;
+  reserveDialog.tableId = table.id;
+  reserveDialog.tableName = table.name;
+  reserveDialog.phoneTail = '';
+}
+
+function confirmReserve() {
+  const phoneTail = reserveDialog.phoneTail.trim();
+  if (!/^\d{4}$/.test(phoneTail)) {
+    ElMessage.warning('请输入4位数字手机尾号');
+    return;
+  }
+
+  const table = state.tables.find((x) => x.id === reserveDialog.tableId);
+  if (!table) return;
+
+  reserveTable(table, phoneTail);
+  reserveDialog.visible = false;
+}
 
 function openAddDialog() {
   addDialog.visible = true;
@@ -565,12 +615,28 @@ function confirmEditTable() {
 }
 
 function onEndTiming(table) {
+  if (table.status === 'in_use') {
+    pauseTable(table);
+    endDialog.pausedForDialog = true;
+  }
   endDialog.visible = true;
   endDialog.tableId = table.id;
 }
 
+function onCloseEndDialog(done) {
+  if (endDialog.pausedForDialog) {
+    const table = state.tables.find((x) => x.id === endDialog.tableId);
+    if (table && table.status === 'paused') {
+      resumeTable(table);
+    }
+    endDialog.pausedForDialog = false;
+  }
+  done();
+}
+
 function confirmEndTiming() {
   if (!endTableRef.value) return;
+  endDialog.pausedForDialog = false;
   endTiming(endTableRef.value);
   endDialog.visible = false;
 }
@@ -644,13 +710,23 @@ async function confirmDeleteArea(area) {
   if (ok) deleteArea(area.id);
 }
 
-async function confirmClearRecords() {
-  const ok = await ElMessageBox.confirm('确认清空所有结算记录？', '清空记录', {
+async function onClearTimingHistories() {
+  const ok = await ElMessageBox.confirm('确认清空所有计时历史记录？', '清空计时记录', {
     type: 'warning',
     confirmButtonText: '清空',
     cancelButtonText: '取消',
   }).then(() => true).catch(() => false);
 
-  if (ok) clearRecords();
+  if (ok) clearTimingHistories();
+}
+
+async function onClearReserveHistories() {
+  const ok = await ElMessageBox.confirm('确认清空所有预约历史记录？', '清空预约记录', {
+    type: 'warning',
+    confirmButtonText: '清空',
+    cancelButtonText: '取消',
+  }).then(() => true).catch(() => false);
+
+  if (ok) clearReserveHistories();
 }
 </script>

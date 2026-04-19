@@ -39,6 +39,7 @@
 
       <!-- 已预约状态：显示预约计时，有立即开台和取消预约按钮 -->
       <template v-else-if="table.status === 'reserved'">
+        <el-tag v-if="table.phoneTail" type="warning" size="small" style="margin-bottom: 6px">尾号 {{ table.phoneTail }}</el-tag>
         <div class="btn-wrap">
           <el-button type="primary" class="manage-btn" @click="emit('start', table)">立即开台</el-button>
         </div>
@@ -51,7 +52,7 @@
       <template v-else-if="table.status === 'selecting'">
         <el-button type="primary" class="action-row-full" @click="emit('start', table)">开始计时</el-button>
         <div class="action-row-split">
-          <el-button type="warning" @click="emit('pause', table)">暂停计时</el-button>
+          <el-button type="warning" disabled @click="emit('pause', table)">暂停计时</el-button>
           <el-button @click="emit('change', table)">更换桌台</el-button>
         </div>
       </template>

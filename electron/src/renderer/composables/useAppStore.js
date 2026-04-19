@@ -99,7 +99,7 @@ export function useAppStore() {
         if (!q) return true;
 
         const tableCode = `${table.codePrefix || 'A'}-${table.number || 0}`;
-        return [tableCode, table.name, table.tag, table.sessionId]
+        return [tableCode, table.name, table.tag, table.sessionId, table.phoneTail]
           .some((item) => String(item || '').toLowerCase().includes(q));
       })
       .sort((a, b) => (a.number || 0) - (b.number || 0));
@@ -165,6 +165,7 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
     table.timerPausedTime = 0;
     table.totalPausedDuration = 0;
     table.sessionId = null;
+    table.phoneTail = '';
   }
 
   function ensureTableShape(table, fallbackPrefix = 'A') {
@@ -194,12 +195,13 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
     ElMessage.success(`「${table.name}」已开台`);
   }
 
-  function reserveTable(table) {
+  function reserveTable(table, phoneTail = '') {
     table.status = 'reserved';
     table.sessionId = genNumericId();
     table.timerStart = Date.now();  // 预约开始计时
     table.timerPausedTime = 0;
     table.totalPausedDuration = 0;
+    table.phoneTail = phoneTail;
     persistTable(table);
     ElMessage.success(`「${table.name}」已预约`);
   }
@@ -214,6 +216,7 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
       tableName: table.name,
       areaName: areaMap.value[table.areaId]?.name || '',
       sessionId: table.sessionId || '',
+      phoneTail: table.phoneTail || '',
       startTime: table.timerStart || Date.now(),
       endTime: Date.now(),
       duration,
@@ -236,6 +239,7 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
       duration,
       revenue: 0,
       type: 'reserve',  // 预约记录类型
+      phoneTail: table.phoneTail || '',
       tableSnapshot: clone(table),
       recordId: reserveRecord.id,
       restoredAt: null,
@@ -256,6 +260,7 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
       table.timerStart = null;
       table.totalPausedDuration = 0;
       table.timerPausedTime = 0;
+      table.phoneTail = '';
       table.status = 'selecting';
       persistTable(table);
       ElMessage.success(`「${table.name}」已开始选豆`);
@@ -508,6 +513,26 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
     }
   }
 
+  function clearTimingHistories() {
+    const toDelete = state.histories.filter((x) => x.type === 'timing');
+    state.histories = state.histories.filter((x) => x.type !== 'timing');
+    for (const h of toDelete) {
+      db.del('histories', h.id).catch((error) => {
+        console.error('[delete timing history error]', error);
+      });
+    }
+  }
+
+  function clearReserveHistories() {
+    const toDelete = state.histories.filter((x) => x.type === 'reserve');
+    state.histories = state.histories.filter((x) => x.type !== 'reserve');
+    for (const h of toDelete) {
+      db.del('histories', h.id).catch((error) => {
+        console.error('[delete reserve history error]', error);
+      });
+    }
+  }
+
   async function init() {
     const data = await db.loadAll();
     state.areas = data.areas || [];
@@ -610,5 +635,7 @@ const reserveHistories = computed(() => sortedHistories.value.filter((h) => h.ty
     deleteArea,
     saveSettings,
     clearRecords,
+    clearTimingHistories,
+    clearReserveHistories,
   };
 }

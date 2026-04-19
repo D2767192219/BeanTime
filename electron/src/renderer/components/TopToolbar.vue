@@ -2,7 +2,7 @@
   <header class="toolbar">
     <el-input
       :model-value="search"
-      placeholder="搜索桌台 / 标签 / 编号"
+      placeholder="搜索桌台 / 标签 / 编号 / 预约手机号"
       clearable
       class="toolbar-search"
       @update:model-value="(value) => emit('update:search', value)"

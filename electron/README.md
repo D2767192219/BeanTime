@@ -45,7 +45,7 @@ npm run dist:mac    # 仅打包 macOS
 - 原生 HTML/CSS/JS（无框架依赖）
 
 
-cd /electron
+cd electro
 npm run dev
 
  # 1. 设置 Electron 核心包镜像 (淘宝)
